@@ -1,7 +1,8 @@
 use bevy::{color::palettes::basic::PURPLE, prelude::*};
 
-const TIME_STEP: f32 = 1. / 60.;
+const TIME_STEP: f32 = 0.05 / 60.;
 const SPEED_MULTIPLIER: f32 = 1.;
+const BORDER_SPACE: f32 = 8.;
 
 #[derive(Component)]
 struct Player;
@@ -9,12 +10,16 @@ struct Player;
 #[derive(Resource)]
 struct PlayerState {
     on: bool,
+    dir_x: f32,
+    dir_y: f32,
     // last_shot: f64,
 }
 impl Default for PlayerState {
     fn default() -> Self {
         Self {
             on: false,
+            dir_x: 1.,
+            dir_y: 0.,
             // last_shot: 0.,
         }
     }
@@ -28,6 +33,17 @@ impl PlayerState {
     fn spawned(&mut self) {
         self.on = true;
         // self.last_shot = 0.
+    }
+
+    fn changed_direction(&mut self, dir_x: f32, dir_y: f32) -> bool {
+        // check if direction changed
+        if self.dir_x == dir_x && self.dir_y == dir_y {
+            return false;
+        }
+
+        self.dir_x = dir_x;
+        self.dir_y = dir_y;
+        true
     }
 }
 
@@ -70,6 +86,7 @@ fn player_spawn(
 }
 
 fn player_movement(
+    mut player_state: ResMut<PlayerState>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     mut query: Query<(&Speed, &mut Transform), With<Player>>,
@@ -77,37 +94,35 @@ fn player_movement(
     if let Ok(window) = windows.get_single() {
         let width = window.resolution.width() / 2.;
         let height = window.resolution.height() / 2.;
-        let dir_x = 1.;
-        let dir_y = 0.;
 
         if let Ok((speed, mut transform)) = query.get_single_mut() {
-            // dir_x = if keyboard_input.pressed(KeyCode::ArrowLeft) {
-            //     -1.
-            // } else if keyboard_input.pressed(KeyCode::ArrowRight) {
-            //     1.
-            // } else {
-            //     0.
-            // };
-            //
-            // dir_y = if keyboard_input.pressed(KeyCode::ArrowUp) {
-            //     1.
-            // } else if keyboard_input.pressed(KeyCode::ArrowDown) {
-            //     -1.
-            // } else {
-            //     0.
-            // };
+            let mut changed_dir = false;
+
+            if keyboard_input.pressed(KeyCode::ArrowLeft) {
+                changed_dir = player_state.changed_direction(-1., 0.);
+            } else if keyboard_input.pressed(KeyCode::ArrowRight) {
+                changed_dir = player_state.changed_direction(1., 0.);
+            };
+
+            if keyboard_input.pressed(KeyCode::ArrowUp) {
+                changed_dir = player_state.changed_direction(0., 1.);
+            } else if keyboard_input.pressed(KeyCode::ArrowDown) {
+                changed_dir = player_state.changed_direction(0., -1.);
+            };
 
             // println!("x: {}, y: {}", transform.translation.x, transform.translation.y);
+            // idea: compare with last direction
+            // last direction must not be the same as next direction
 
             // playground boundaries, don't move outer this
-            if transform.translation.x + (dir_x * speed.0 * TIME_STEP) < width - 8. 
-                && transform.translation.x + (dir_x * speed.0 * TIME_STEP) > -width + 8. {
-                transform.translation.x += dir_x * speed.0 * TIME_STEP;
+            if transform.translation.x + (player_state.dir_x * speed.0 * TIME_STEP) < width - BORDER_SPACE 
+                && transform.translation.x + (player_state.dir_x * speed.0 * TIME_STEP) > -width + BORDER_SPACE {
+                transform.translation.x += if changed_dir { player_state.dir_x } else { player_state.dir_x * speed.0 * TIME_STEP };
             }
 
-            if transform.translation.y + (dir_y * speed.0 * TIME_STEP) < height - 8.
-                && transform.translation.y + (dir_y * speed.0 * TIME_STEP) > -height + 8. {
-                transform.translation.y += dir_y * speed.0 * TIME_STEP;
+            if transform.translation.y + (player_state.dir_y * speed.0 * TIME_STEP) < height - BORDER_SPACE
+                && transform.translation.y + (player_state.dir_y * speed.0 * TIME_STEP) > -height + BORDER_SPACE {
+                transform.translation.y += if changed_dir { player_state.dir_y } else { player_state.dir_y * speed.0 * TIME_STEP };
             }
         }
     } else {
